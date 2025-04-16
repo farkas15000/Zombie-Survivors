@@ -2,11 +2,12 @@ let canvas
 let ctx
 
 let state = "menu"
-let prevstate = "game"
+let prevState = "game"
 
 let states = {}
 
-const mousepos = new Vector2()
+const mousePos = new Vector2()
+let mouseClick = [false, false]
 
 const keys = {
     w: false,
@@ -14,6 +15,8 @@ const keys = {
     s: false,
     d: false
 }
+
+let dt = 0.016
 
 const path = "Q9329E/"
 const sources = {
@@ -45,6 +48,15 @@ $(document).ready(function ready() {
     ctx = canvas.getContext('2d')
 
     $(canvas).on('mousemove', getMouse)
+    $(canvas).on('mousedown', () => {
+        mouseClick = [mouseClick[1], true]
+        //console.log(mouseClick)
+    })
+    $(canvas).on('mouseup', () => {
+        mouseClick = [mouseClick[1], false]
+        //console.log(mouseClick)
+
+    })
 
     $(window).on('keydown', (e) => {
         if (keys.hasOwnProperty(e.key.toLowerCase())) {
@@ -67,8 +79,8 @@ $(document).ready(function ready() {
 
 function getMouse(e){
     const rect = canvas.getBoundingClientRect()
-    mousepos.x = Math.ceil(e.clientX - rect.left)
-    mousepos.y = Math.ceil(e.clientY - rect.top)
+    mousePos.x = Math.ceil(e.clientX - rect.left)
+    mousePos.y = Math.ceil(e.clientY - rect.top)
 }
 
 function Vector2(x=0, y=0) {
@@ -145,20 +157,33 @@ function Rect(x=0, y=0, w=0, h=0) {
         ctx.stroke ()
         ctx.strokeStyle = style
     }
+    this.collidepoint = function (vector2){
+        return (this.pos.x < vector2.x &&
+            this.pos.x + this.size.x > vector2.x &&
+            this.pos.y < vector2.y &&
+            this.pos.y + this.size.y > vector2.y)
+
+    }
 
 }
 
-function draw(img, pos, offset=[0, 0], rotation=0){
+function draw(img, scale=[1, 1], pos, offset=[0, 0], rotation=0){
     ctx.save()
     ctx.translate(pos.x, pos.y)
     if (rotation!==0) {
         ctx.rotate(rotation * (Math.PI/180))
     }
-    let w = img.width
-    let h = img.height
-    ctx.drawImage(img, -w / 2 + w*offset[0], -h / 2 + h*offset[1])
+    let w = img.width * scale[0]
+    let h = img.height * scale[1]
+    ctx.drawImage(img, -w / 2 + w*offset[0], -h / 2 + h*offset[1], w,  h)
     ctx.restore()
 
+    return getRect(img, scale, pos, offset, rotation)
+}
+
+function getRect(img, scale=[1, 1], pos, offset=[0, 0], rotation=0){
+    let w = img.width*scale[0]
+    let h = img.height*scale[1]
     let topleft = new Vector2(w*offset[0],  h*offset[1])
     topleft.rotate(rotation)
 
@@ -197,26 +222,92 @@ function Player(img, health, speed) {
     this.update = function() {
         let vect = new Vector2(keys.d-keys.a, keys.s-keys.w)
         vect.normalise()
-        this.pos.add(vect.mult(this.speed))
+        this.pos.add(vect.mult(this.speed*dt))
     }
     this.draw = function() {
-         draw(this.img, this.pos, [0, 0], this.rot)
+         draw(this.img, [1, 1], this.pos, [0, 0], this.rot)
 
+    }
+}
+
+class Button {
+    constructor(img, scale, pos, offset, popup, sound=null) {
+        this.img = img
+        this.scale = scale
+        this.pos = pos
+        this.offset = offset
+        this.popup = popup
+        this.sound = sound
+
+        this.xm = this.scale[0]
+        this.ym = this.scale[1]
+        this.rect = getRect(this.img, [this.xm, this.ym], this.pos, this.offset)
+
+        this.on = [false, false]
+        this.held = [false, false]
+        this.clicked = 0
+    }
+    update(doDraw=true) {
+
+        this.rect = draw(this.img, [this.xm, this.ym], this.pos, this.offset)
+        this.on = [this.on[1], this.rect.collidepoint(mousePos)]
+
+        if (this.on[1]) {
+            this.xm = this.scale[0] * this.popup[0]
+            this.ym = this.scale[1] * this.popup[1]
+        } else {
+            this.xm = this.scale[0]
+            this.ym = this.scale[1]
+            this.rect = getRect( this.img, [this.xm, this.ym], this.pos, this.offset,
+            )
+        }
+
+        if (mouseClick[1] && !mouseClick[0] && this.on[1]) {
+            this.held = [this.held[1], 1]
+        } else {
+            this.held = [this.held[1], 0]
+        }
+
+        if (this.held[1] && !this.held[0] && this.on[0]){
+            this.clicked = 1
+        } else {
+            this.clicked = 0
+        }
+
+        if (doDraw) {
+            this.draw()
+        }
+
+        if (this.clicked && this.sound) {
+            //todo this.sound.play()
+        }
+
+        return this.rect
+    }
+    draw(){
+        this.rect = draw(this.img, [this.xm, this.ym], this.pos, this.offset, 0)
+        return this.rect
     }
 }
 
 class Game {
     constructor() {
         state = "game"
-        this.player = new Player(Assets.player, 100, 3)
+        this.player = new Player(Assets.player, 100, 300)
+        this.button = new Button(Assets.enemy, [1, 1], new Vector2(100, 100), [0, 0], [1.1, 1.1])
     }
     update() {
-        if (prevstate==="menu" && state==="game"){
+        if (prevState==="menu" && state==="game"){
             console.log("game")
         }
 
         this.player.update()
         this.player.draw()
+
+        this.button.update()
+        if (this.button.clicked){
+            console.log("clicked")
+        }
 
     }
 }
@@ -225,7 +316,7 @@ class Menu {
     constructor() {
     }
     update() {
-        if (prevstate==="game" && state==="menu"){
+        if (prevState==="game" && state==="menu"){
             console.log("menu")}
 
         states["game"] = new Game()
@@ -233,14 +324,18 @@ class Menu {
     }
 }
 
-function main() {
+function main(timestamp) {
+    if (!main.lastTime) main.lastTime = timestamp;
+    dt = (timestamp - main.lastTime) / 1000; // in seconds
+    main.lastTime = timestamp;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
     let ps = state
 
     states[state].update()
 
-    prevstate = ps
+    prevState = ps
 
     requestAnimationFrame(main)
 
