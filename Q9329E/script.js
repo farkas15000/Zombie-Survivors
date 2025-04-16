@@ -112,6 +112,10 @@ function Vector2(x=0, y=0) {
         return this
     }
 
+    this.angleTo = function(vector2) {
+        return Math.atan2(vector2.y - this.y, vector2.x - this.x)*180/Math.PI
+    }
+
     this.copy = function() {
         return new Vector2(this.x, this.y)
     }
@@ -223,6 +227,7 @@ function Player(img, health, speed) {
         let vect = new Vector2(keys.d-keys.a, keys.s-keys.w)
         vect.normalise()
         this.pos.add(vect.mult(this.speed*dt))
+        this.rot = this.pos.angleTo(mousePos)+90
     }
     this.draw = function() {
          draw(this.img, [1, 1], this.pos, [0, 0], this.rot)
@@ -306,7 +311,6 @@ class Game {
 
         this.button.update()
         if (this.button.clicked){
-            console.log("clicked")
         }
 
     }
