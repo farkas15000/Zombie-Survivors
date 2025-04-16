@@ -13,7 +13,10 @@ const keys = {
     w: false,
     a: false,
     s: false,
-    d: false
+    d: false,
+    escape: false,
+    enter: false,
+    " ": false,
 }
 
 let dt = 0.016
@@ -50,11 +53,9 @@ $(document).ready(function ready() {
     $(canvas).on('mousemove', getMouse)
     $(canvas).on('mousedown', () => {
         mouseClick = [mouseClick[1], true]
-        //console.log(mouseClick)
     })
     $(canvas).on('mouseup', () => {
         mouseClick = [mouseClick[1], false]
-        //console.log(mouseClick)
 
     })
 
@@ -81,6 +82,10 @@ function getMouse(e){
     const rect = canvas.getBoundingClientRect()
     mousePos.x = Math.ceil(e.clientX - rect.left)
     mousePos.y = Math.ceil(e.clientY - rect.top)
+}
+
+function clamp(value, min, max){
+    return Math.min(Math.max(value, min), max)
 }
 
 function Vector2(x=0, y=0) {
@@ -171,6 +176,17 @@ function Rect(x=0, y=0, w=0, h=0) {
 
 }
 
+function write(text, font, size, x, y, color="Black", align="start"){
+    let style = ctx.fillStyle
+    ctx.fillStyle = color
+    ctx.textAlign = align
+
+    ctx.font = size + "px " + font
+    ctx.fillText (text ,x , y)
+
+    ctx.fillStyle = style
+}
+
 function draw(img, scale=[1, 1], pos, offset=[0, 0], rotation=0){
     ctx.save()
     ctx.translate(pos.x, pos.y)
@@ -251,6 +267,7 @@ class Button {
         this.on = [false, false]
         this.held = [false, false]
         this.clicked = 0
+        this.grabbed = 0
     }
     update(doDraw=true) {
 
@@ -279,6 +296,12 @@ class Button {
             this.clicked = 0
         }
 
+        if ((this.clicked || (this.grabbed && mouseClick[1]))) {
+            this.grabbed = 1
+        } else {
+            this.grabbed = 0
+        }
+
         if (doDraw) {
             this.draw()
         }
@@ -295,11 +318,52 @@ class Button {
     }
 }
 
+class Slider extends Button {
+    static map_value(value, value_min, value_max, map_min, map_max) {
+        return ((value - value_min) / (value_max - value_min)) * (map_max - map_min) + map_min
+    }
+    constructor(img, scale, pos, offset, popup, sound, horizontal=true, posmap=[100, 300], value_map=[0, 100], stepsize=1) {
+        super(img, scale, pos, offset, popup, sound);
+        this.posMap = posmap
+        this.valueMap = value_map
+        this.stepSize = stepsize
+        this.horizontal = horizontal
+        this._value = 0
+        this.value = value_map[0]
+    }
+    get value() {
+        return this._value;
+    }
+    set value(value) {
+        let mod = value % this.stepSize
+        value = Math.floor(clamp(value - mod + (mod * 2 >= this.stepSize ? this.stepSize : 0), this.valueMap[0], this.valueMap[1],))
+
+        this._value = value
+        this.pos[!this.horizontal?"y":"x"] = ((value - this.valueMap[0]) / (this.valueMap[1] - this.valueMap[0])) * (this.posMap[1] - this.posMap[0]) + this.posMap[0]
+    }
+
+    update(doDraw = true) {
+        let rect = super.update(doDraw);
+
+        if (this.grabbed && !this.clicked)
+        {
+            this.value = ((mousePos[!this.horizontal?"y":"x"]-this.posMap[0]) / (this.posMap[1] - this.posMap[0])) * (this.valueMap[1] - this.valueMap[0]) + this.valueMap[0]
+        }
+
+        return rect
+    }
+}
+
 class Game {
     constructor() {
         state = "game"
         this.player = new Player(Assets.player, 100, 300)
         this.button = new Button(Assets.enemy, [1, 1], new Vector2(100, 100), [0, 0], [1.1, 1.1])
+        this.slider = new Slider(Assets.enemy, [1, 1], new Vector2(100, 300), [0, 0], [1.1, 1.1], null,
+            true, [100, 300], [0, 100], 1)
+    }
+    destruct(){
+        states["game"] = null
     }
     update() {
         if (prevState==="menu" && state==="game"){
@@ -309,8 +373,14 @@ class Game {
         this.player.update()
         this.player.draw()
 
+        write("Asd asd", "Arial", 32, 200, 200, "White", "center")
+
+        this.slider.update()
+
         this.button.update()
         if (this.button.clicked){
+            this.destruct()
+            state = "menu"
         }
 
     }
@@ -318,12 +388,18 @@ class Game {
 
 class Menu {
     constructor() {
+        this.button = new Button(Assets.enemy, [2, 2], new Vector2(500, 300), [0, 0], [1.1, 1.1])
     }
     update() {
         if (prevState==="game" && state==="menu"){
-            console.log("menu")}
+            console.log("menu")
+        }
 
-        states["game"] = new Game()
+        this.button.update()
+        if (this.button.clicked){
+            states["game"] = new Game()
+        }
+
 
     }
 }
@@ -342,5 +418,4 @@ function main(timestamp) {
     prevState = ps
 
     requestAnimationFrame(main)
-
 }
