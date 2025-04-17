@@ -24,12 +24,15 @@ const keys = {
 
 let dt = 0.016
 
-const path = "Q9329E/"
+const path = "Q9329E/assets/"
 const sources = {
-    player: 'player.png',
-    zombie: 'enemy.png',
+    player: 'player1.png',
+    zombie1: 'zombie1.png',
+    zombie2: 'zombie2.png',
+    bullet: 'bullet.png',
     info: 'info.png',
-    button: 'button1.png',
+    button1: 'button2.png',
+    button2: 'button3.png',
 }
 const Assets = {}
 
