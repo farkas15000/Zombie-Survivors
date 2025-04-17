@@ -242,10 +242,13 @@ function Zombie(img, health, speed) {
     }
 }
 
-function Player(img, health, speed) {
+function Player(img, health, speed, firerate, bullets) {
     this.img = img
     this.health = health
     this.speed = speed
+    this.firerate = firerate
+    this.shootTimer = 1
+    this.bulets = bullets
     this.pos = new Vector2(100, 100)
     this.rot = 0
     let padding = 40
@@ -258,10 +261,19 @@ function Player(img, health, speed) {
         if (this.wallRect.collidepoint(this.pos.copy().add(vect))){
             this.pos.add(vect)
         }
-        this.rot = this.pos.angleTo(mousePos)+90
+        this.rot = this.pos.angleTo(mousePos)-4.7+this.pos.distanceTo(mousePos)/280
+
+        if (mouseClick[1] && this.shootTimer<=0){
+            this.shootTimer = 1/this.firerate
+            let bullet = new Bullet(Assets.bullet, new Vector2(2*52, 2*11).rotate(this.rot).add(this.pos), this.rot, 1000)
+            this.bulets.push(bullet)
+        } else {
+            this.shootTimer-=dt
+        }
+
     }
     this.draw = function() {
-         draw(this.img, [1, 1], this.pos, [0, 0], this.rot)
+         draw(this.img, [2, 2], this.pos, [0.25, -0.03], this.rot)
 
     }
 }
@@ -272,7 +284,7 @@ function Bullet(img, pos, rotation, speed) {
     this.pos = pos
     this.direction = new Vector2(1, 0).rotate(rotation)
     this.rot = rotation
-    let padding = -100
+    let padding = -400
     this.wallRect = new Rect(padding, padding, windowSize.x-2*padding, windowSize.y-2*padding)
     this.alive = true
 
@@ -403,9 +415,10 @@ class Game {
         this.diff = difficulty
         state = "game"
 
-        this.exit = new Button(Assets.button, [1, 1], new Vector2(100, 60), [0, 0], [1.1, 1.1])
+        this.exit = new Button(Assets.button2, [1, 1], new Vector2(100, 60), [0, 0], [1.1, 1.1])
 
-        this.player = new Player(Assets.player, 100, 300)
+        this.bullets = []
+        this.player = new Player(Assets.player, 100, 300, 6, this.bullets)
 
     }
     destruct(){
@@ -414,6 +427,12 @@ class Game {
     update() {
         if (prevState==="menu" && state==="game"){
             console.log("game")
+        }
+
+        this.killEntities(this.bullets)
+        for (const bullet of this.bullets) {
+            bullet.update()
+            bullet.draw()
         }
 
         this.player.update()
@@ -427,22 +446,30 @@ class Game {
         }
 
     }
+
+    killEntities(list=[]){
+        for (let i = list.length - 1; i >= 0; i--) {
+            if (!list[i].alive) {
+                list.splice(i, 1);
+            }
+        }
+    }
 }
 
 class Menu {
     constructor() {
         this.middle =windowSize.copy().mult(0.5)
 
-        this.easy = new Button(Assets.button, [1, 1], new Vector2(-200, 0).add(this.middle), [0, 0], [1.1, 1.1], "Easy")
-        this.medium = new Button(Assets.button, [1, 1], new Vector2(0, 0).add(this.middle), [0, 0], [1.1, 1.1], "Medium")
-        this.hard = new Button(Assets.button, [1, 1], new Vector2(200, 0).add(this.middle), [0, 0], [1.1, 1.1], "Hard")
+        this.easy = new Button(Assets.button1, [0.6, 0.8], new Vector2(-200, 0).add(this.middle), [0, 0], [1.1, 1.1], "Easy")
+        this.medium = new Button(Assets.button1, [0.6, 0.8], new Vector2(0, 0).add(this.middle), [0, 0], [1.1, 1.1], "Medium")
+        this.hard = new Button(Assets.button1, [0.6, 0.8], new Vector2(200, 0).add(this.middle), [0, 0], [1.1, 1.1], "Hard")
         this.dificulty =[this.easy, this.medium, this.hard]
 
-        this.volume = new Slider(Assets.button, [0.4, 0.4], new Vector2(100, this.middle.y+100), [0, 0], [1.1, 1.1], "",null,
+        this.volume = new Slider(Assets.button2, [0.6, 0.6], new Vector2(100, this.middle.y+120), [0, 0], [1.1, 1.1], "",null,
             true, [this.middle.x-100, this.middle.x+100], [0, 100], 1)
         this.volume.value = volume*100
 
-        this.info = new Button(Assets.info, [0.5, 0.5], new Vector2(windowSize.x, 0), [-0.5, 0.5], [1, 1])
+        this.info = new Button(Assets.button2, [0.7, 0.7], new Vector2(windowSize.x, 0), [-0.5, 0.5], [1, 1], "?")
     }
     update() {
         if (prevState==="game" && state==="menu"){
@@ -453,7 +480,7 @@ class Menu {
             button.update()
         }
 
-        write("Start game", font, 60, this.middle.x, this.middle.y-150, "White", "center")
+        write("Start game", font, 60, this.middle.x, this.middle.y-120, "White", "center")
 
         if (this.easy.clicked){
             states["game"] = new Game(1)
