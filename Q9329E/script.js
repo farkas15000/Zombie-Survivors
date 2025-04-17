@@ -1,6 +1,7 @@
 let canvas
 let ctx
 const windowSize = new Vector2(1264, 720)
+const middle = windowSize.copy().mult(0.5)
 let volume = 0.5
 
 let state = "menu"
@@ -244,15 +245,45 @@ function Player(img, health, speed) {
     this.speed = speed
     this.pos = new Vector2(100, 100)
     this.rot = 0
+    let padding = 40
+    this.wallRect = new Rect(padding, padding, windowSize.x-2*padding, windowSize.y-2*padding)
 
     this.update = function() {
+
         let vect = new Vector2(keys.d-keys.a, keys.s-keys.w)
-        vect.normalise()
-        this.pos.add(vect.mult(this.speed*dt))
+        vect.normalise().mult(this.speed*dt)
+        if (this.wallRect.collidepoint(this.pos.copy().add(vect))){
+            this.pos.add(vect)
+        }
         this.rot = this.pos.angleTo(mousePos)+90
     }
     this.draw = function() {
          draw(this.img, [1, 1], this.pos, [0, 0], this.rot)
+
+    }
+}
+
+function Bullet(img, pos, rotation, speed) {
+    this.img = img
+    this.speed = speed
+    this.pos = pos
+    this.direction = new Vector2(1, 0).rotate(rotation)
+    this.rot = rotation
+    let padding = -100
+    this.wallRect = new Rect(padding, padding, windowSize.x-2*padding, windowSize.y-2*padding)
+    this.alive = true
+
+    this.update = function() {
+
+        this.pos.add(this.direction.copy().mult(this.speed*dt))
+
+        if (!this.wallRect.collidepoint(this.pos)){
+            this.alive = false
+            return
+        }
+    }
+    this.draw = function() {
+        draw(this.img, [1, 1], this.pos, [0, 0], this.rot)
 
     }
 }
@@ -365,12 +396,14 @@ class Slider extends Button {
 }
 
 class Game {
-    constructor() {
+    constructor(difficulty) {
+        this.diff = difficulty
         state = "game"
+
+        this.exit = new Button(Assets.button, [1, 1], new Vector2(100, 60), [0, 0], [1.1, 1.1])
+
         this.player = new Player(Assets.player, 100, 300)
-        this.button = new Button(Assets.button, [1, 1], new Vector2(100, 100), [0, 0], [1.1, 1.1])
-        this.slider = new Slider(Assets.button, [1, 1], new Vector2(100, 300), [0, 0], [1.1, 1.1], "",null,
-            true, [100, 300], [0, 100], 1)
+
     }
     destruct(){
         states["game"] = null
@@ -383,14 +416,11 @@ class Game {
         this.player.update()
         this.player.draw()
 
-        write("Asd asd", font, 32, 200, 200, "White", "center")
-
-        this.slider.update()
-
-        this.button.update()
-        if (this.button.clicked){
+        this.exit.update()
+        if (this.exit.clicked){
             this.destruct()
             state = "menu"
+            return 0
         }
 
     }
@@ -398,15 +428,15 @@ class Game {
 
 class Menu {
     constructor() {
-        this.half =windowSize.copy().mult(0.5)
+        this.middle =windowSize.copy().mult(0.5)
 
-        this.easy = new Button(Assets.button, [1, 1], new Vector2(-200, 0).add(this.half), [0, 0], [1.1, 1.1], "Easy")
-        this.medium = new Button(Assets.button, [1, 1], new Vector2(0, 0).add(this.half), [0, 0], [1.1, 1.1], "Medium")
-        this.hard = new Button(Assets.button, [1, 1], new Vector2(200, 0).add(this.half), [0, 0], [1.1, 1.1], "Hard")
+        this.easy = new Button(Assets.button, [1, 1], new Vector2(-200, 0).add(this.middle), [0, 0], [1.1, 1.1], "Easy")
+        this.medium = new Button(Assets.button, [1, 1], new Vector2(0, 0).add(this.middle), [0, 0], [1.1, 1.1], "Medium")
+        this.hard = new Button(Assets.button, [1, 1], new Vector2(200, 0).add(this.middle), [0, 0], [1.1, 1.1], "Hard")
         this.dificulty =[this.easy, this.medium, this.hard]
 
-        this.volume = new Slider(Assets.button, [0.4, 0.4], new Vector2(100, this.half.y+100), [0, 0], [1.1, 1.1], "",null,
-            true, [this.half.x-100, this.half.x+100], [0, 100], 1)
+        this.volume = new Slider(Assets.button, [0.4, 0.4], new Vector2(100, this.middle.y+100), [0, 0], [1.1, 1.1], "",null,
+            true, [this.middle.x-100, this.middle.x+100], [0, 100], 1)
         this.volume.value = volume*100
 
         this.info = new Button(Assets.info, [0.5, 0.5], new Vector2(windowSize.x, 0), [-0.5, 0.5], [1, 1])
@@ -420,20 +450,20 @@ class Menu {
             button.update()
         }
 
-        write("Start game", font, 60, this.half.x, this.half.y-150, "White", "center")
+        write("Start game", font, 60, this.middle.x, this.middle.y-150, "White", "center")
 
         if (this.easy.clicked){
-            states["game"] = new Game()
+            states["game"] = new Game(1)
         }
         if (this.medium.clicked){
-            states["game"] = new Game()
+            states["game"] = new Game(2)
         }
         if (this.hard.clicked){
-            states["game"] = new Game()
+            states["game"] = new Game(3)
         }
 
         this.volume.update()
-        write("Volume: "+this.volume.value+"%", font, 30, this.half.x-150, this.volume.pos.y+12, "White", "right")
+        write("Volume: "+this.volume.value+"%", font, 30, this.middle.x-150, this.volume.pos.y+12, "White", "right")
         volume = this.volume.value
 
         write("Készítette: Füleki Balázs", font, 40, windowSize.x-10, windowSize.y-10, "White", "right")
@@ -442,22 +472,22 @@ class Menu {
         if (this.info.on[1]){
             let y=2.5
             let multi= 26
-            write("Help menu", font, 24, this.half.x+320, multi*y++, "White")
+            write("Help menu", font, 24, this.middle.x+320, multi*y++, "White")
             y+=0.5
-            write("Controls", font, 24, this.half.x+320, multi*y++, "White")
-            write("Up: W", font, 24, this.half.x+320, multi*y++, "White")
-            write("Left: A", font, 24, this.half.x+320, multi*y++, "White")
-            write("Down: S", font, 24, this.half.x+320, multi*y++, "White")
-            write("Right: D", font, 24, this.half.x+320, multi*y++, "White")
-            write("Shoot: Left click", font, 24, this.half.x+320, multi*y++, "White")
-            write("Flint and Steel: F", font, 24, this.half.x+320, multi*y++, "White")
+            write("Controls", font, 24, this.middle.x+320, multi*y++, "White")
+            write("Up: W", font, 24, this.middle.x+320, multi*y++, "White")
+            write("Left: A", font, 24, this.middle.x+320, multi*y++, "White")
+            write("Down: S", font, 24, this.middle.x+320, multi*y++, "White")
+            write("Right: D", font, 24, this.middle.x+320, multi*y++, "White")
+            write("Shoot: Left click", font, 24, this.middle.x+320, multi*y++, "White")
+            write("Flint and Steel: F", font, 24, this.middle.x+320, multi*y++, "White")
             y+=1
-            write("Egyedűl maradtál egy", font, 24, this.half.x+320, multi*y++, "White")
-            write("zombi apokalipszis közepén.", font, 24, this.half.x+320, multi*y++, "White")
-            write("A küldetésed minnél tovább", font, 24, this.half.x+320, multi*y++, "White")
-            write("életben maradni és", font, 24, this.half.x+320, multi*y++, "White")
-            write("magasabb pontszámot elérni", font, 24, this.half.x+320, multi*y++, "White")
-            write("a ranglétrán.", font, 24, this.half.x+320, multi*y++, "White")
+            write("Egyedűl maradtál egy", font, 24, this.middle.x+320, multi*y++, "White")
+            write("zombi apokalipszis közepén.", font, 24, this.middle.x+320, multi*y++, "White")
+            write("A küldetésed minnél tovább", font, 24, this.middle.x+320, multi*y++, "White")
+            write("életben maradni és", font, 24, this.middle.x+320, multi*y++, "White")
+            write("magasabb pontszámot elérni", font, 24, this.middle.x+320, multi*y++, "White")
+            write("a ranglétrán.", font, 24, this.middle.x+320, multi*y++, "White")
         }
 
     }
