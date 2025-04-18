@@ -29,8 +29,9 @@ const sources = {
     player: 'player1.png',
     zombie1: 'zombie1.png',
     zombie2: 'zombie2.png',
-    bullet: 'bullet.png',
-    info: 'info.png',
+    bullet: 'bullet1.png',
+    grass: 'grass.png',
+    shoot: 'shoot.png',
     button1: 'button2.png',
     button2: 'button3.png',
 }
@@ -54,6 +55,10 @@ function loadAssets(assetMap) {
     }
 
     return Promise.all(promises)
+}
+
+function getRndInteger(min, max) {
+    return Math.floor(Math.random() * (max - min) ) + min;
 }
 
 $(document).ready(function ready() {
@@ -151,6 +156,9 @@ function Vector2(x=0, y=0) {
     this.distanceTo = function (vector2){
         return Math.sqrt((this.x-vector2.x)**2+(this.y-vector2.y)**2)
     }
+    this.distanceToSquared = function (vector2){
+        return (this.x-vector2.x)**2+(this.y-vector2.y)**2
+    }
 }
 
 function Rect(x=0, y=0, w=0, h=0) {
@@ -232,16 +240,6 @@ function getRect(img, scale=[1, 1], pos, offset=[0, 0], rotation=0){
     return absrect
 }
 
-function Zombie(img, health, speed) {
-    this.img = img
-    this.health = health
-    this.speed = speed
-    this.pos = new Vector2(0, 0)
-    this.move = function() {
-        return 0
-    }
-}
-
 function Player(img, health, speed, firerate, bullets) {
     this.img = img
     this.health = health
@@ -249,23 +247,25 @@ function Player(img, health, speed, firerate, bullets) {
     this.firerate = firerate
     this.shootTimer = 1
     this.bulets = bullets
-    this.pos = new Vector2(100, 100)
+    this.shot = false
+    this.pos = middle.copy()
     this.rot = 0
-    let padding = 40
+    let padding = 20
     this.wallRect = new Rect(padding, padding, windowSize.x-2*padding, windowSize.y-2*padding)
 
     this.update = function() {
 
         let vect = new Vector2(keys.d-keys.a, keys.s-keys.w)
-        vect.normalise().mult(this.speed*dt)
+        vect.normalise().mult(this.speed*dt*(1-0.4*mouseClick[1]))
         if (this.wallRect.collidepoint(this.pos.copy().add(vect))){
             this.pos.add(vect)
         }
-        this.rot = this.pos.angleTo(mousePos)-4.7+this.pos.distanceTo(mousePos)/280
+        this.rot = this.pos.angleTo(mousePos)-3+this.pos.distanceTo(mousePos)/280
 
         if (mouseClick[1] && this.shootTimer<=0){
             this.shootTimer = 1/this.firerate
-            let bullet = new Bullet(Assets.bullet, new Vector2(2*52, 2*11).rotate(this.rot).add(this.pos), this.rot, 1000)
+            this.shot = true
+            let bullet = new Bullet(Assets.bullet, new Vector2(50, 12).rotate(this.rot).add(this.pos), this.rot+getRndInteger(-2, 2), 1000)
             this.bulets.push(bullet)
         } else {
             this.shootTimer-=dt
@@ -273,7 +273,12 @@ function Player(img, health, speed, firerate, bullets) {
 
     }
     this.draw = function() {
-         draw(this.img, [2, 2], this.pos, [0.25, -0.03], this.rot)
+        draw(this.img, [1, 1], this.pos, [0.25, -0.03], this.rot)
+        if (this.shot){
+            this.shot = false
+            draw(Assets.shoot, [0.7, 0.6],  new Vector2(52, 11).rotate(this.rot).add(this.pos), [0.6, 0], this.rot)
+
+        }
 
     }
 }
@@ -284,7 +289,7 @@ function Bullet(img, pos, rotation, speed) {
     this.pos = pos
     this.direction = new Vector2(1, 0).rotate(rotation)
     this.rot = rotation
-    let padding = -400
+    let padding = -100
     this.wallRect = new Rect(padding, padding, windowSize.x-2*padding, windowSize.y-2*padding)
     this.alive = true
 
@@ -298,7 +303,38 @@ function Bullet(img, pos, rotation, speed) {
         }
     }
     this.draw = function() {
-        draw(this.img, [1, 1], this.pos, [0, 0], this.rot)
+        draw(this.img, [0.6, 0.6], this.pos, [0, 0], this.rot)
+
+    }
+}
+
+function Zombie(img, health, speed, score, player) {
+    this.img = img
+    this.health = health
+    this.alive = true
+    this.speed = speed
+    this.score = score
+    this.player = player
+    this.pos = middle.copy().mult(1.3).rotate(getRndInteger(0, 360)).add(middle)
+    this.rot = 0
+
+    this.update = function() {
+        if (this.health<=0){
+            this.alive=false
+            return 1
+        }
+
+        this.rot = this.pos.angleTo(this.player.pos)
+        if (this.pos.distanceTo(this.player.pos)>40) {
+            let vect = new Vector2(this.speed * dt, 0).rotate(this.rot)
+            this.pos.add(vect)
+        } else {
+            this.player.health-=dt*15
+        }
+        return 0
+    }
+    this.draw = function() {
+        draw(this.img, [1.8, 1.8], this.pos, [0, 0], this.rot)
 
     }
 }
@@ -413,12 +449,17 @@ class Slider extends Button {
 class Game {
     constructor(difficulty) {
         this.diff = difficulty
+        this.score = 0
         state = "game"
 
-        this.exit = new Button(Assets.button2, [1, 1], new Vector2(100, 60), [0, 0], [1.1, 1.1])
+        this.exit = new Button(Assets.button2, [0.8, 0.5], new Vector2(50, 40), [0, 0], [1.1, 1.1], "Exit")
 
         this.bullets = []
-        this.player = new Player(Assets.player, 100, 300, 6, this.bullets)
+        this.player = new Player(Assets.player, 100, 300, 8, this.bullets)
+
+        this.enemyCap=14
+        this.enemyMax=3
+        this.zombies  = []
 
     }
     destruct(){
@@ -429,6 +470,52 @@ class Game {
             console.log("game")
         }
 
+        draw(Assets.grass, [1, 1], middle, [0, 0], 0)
+
+        if (this.zombies.length<this.enemyMax){
+            if (getRndInteger(0, 10) < 8) {
+                this.zombies.push(new Zombie(Assets.zombie1, 50, 100, 100, this.player))
+            } else {
+                this.zombies.push(new Zombie(Assets.zombie2, 100, 60, 200, this.player))
+            }
+        }
+
+        // bullet zombie collide hit
+        for (const zombie of this.zombies) {
+            for (const bullet of this.bullets) {
+                if (bullet.alive && zombie.alive && zombie.pos.distanceToSquared(bullet.pos) <= 30**2){
+                    zombie.health-=10
+                    bullet.alive=false
+                }
+            }
+        }
+        this.killEntities(this.zombies)
+        // zombie to zombie collision handle
+        for (let i = 0; i < this.zombies.length; i++) {
+            for (let j = i+1; j < this.zombies.length; j++) {
+                let z1 = this.zombies[i]
+                let z2 = this.zombies[j]
+                let dist = z1.pos.distanceTo(z2.pos)
+                let min = 60
+                if (dist < min){
+                    let vect = z1.pos.copy().mult(-1).add(z2.pos).normalise().mult((min-dist)/2)
+
+                    z2.pos.add(vect)
+                    z1.pos.add(vect.mult(-1))
+                }
+            }
+        }
+        for (const zombie of this.zombies) {
+            let died = zombie.update()
+            zombie.draw()
+
+            if (died){
+                this.enemyMax = Math.min(this.enemyCap, this.enemyMax+0.1)
+                this.score+=zombie.score
+            }
+
+        }
+
         this.killEntities(this.bullets)
         for (const bullet of this.bullets) {
             bullet.update()
@@ -437,6 +524,10 @@ class Game {
 
         this.player.update()
         this.player.draw()
+
+        write("Health: "+Math.ceil(Math.max(this.player.health, 0))+"%", font, 50, 30, windowSize.y-30, "White", "start")
+
+        write("Score: " + this.score, font, 60, middle.x, 70, "White", "center")
 
         this.exit.update()
         if (this.exit.clicked){
