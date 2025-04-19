@@ -5,6 +5,7 @@ const middle = windowSize.copy().mult(0.5)
 let volume = 0.5
 
 let scoreboard = []
+let lastname = ""
 
 let state = "menu"
 let prevState = "game"
@@ -116,6 +117,19 @@ $(document).ready(function ready() {
             keys[e.key.toLowerCase()] = 0
         }
     })
+
+    //localStorage.clear()
+
+    for (let i = 0; i < localStorage.length; i++) {
+        if (localStorage.key(i)==="scoreboard"){
+            scoreboard = JSON.parse(localStorage.getItem("scoreboard"))
+        }
+        if (localStorage.key(i)==="volume"){
+            volume = localStorage.getItem("volume")
+        }
+    }
+
+    //localStorage.clear()
 
     loadAssets(assetSources).then(() => {
         loadAudio(audioSources).then(() => {
@@ -613,35 +627,65 @@ class Menu {
             true, [this.middle.x-100, this.middle.x+100], [0, 100], 1)
         this.volume.value = volume*100
 
+        this.scoreboard = new Button(Assets.button1, [0.8, 0.8], new Vector2(0, 220).add(this.middle), [0, 0], [1.1, 1.1], "Scoreboard")
+        this.back = new Button(Assets.button2, [0.8, 0.5], new Vector2(50, 40), [0, 0], [1.1, 1.1], "Back")
+        this.clear = new Button(Assets.button1, [0.5, 0.5], new Vector2(860, 40), [0, 0], [1.1, 1.1], "Clear")
+        this.scoretab = false
+
+
     }
     update() {
         if (prevState==="game" && state==="menu"){
             //console.log("menu")
         }
 
-        for (const button of this.dificulty) {
-            button.update()
+        if (!this.scoretab) {
+            for (const button of this.dificulty) {
+                button.update()
+            }
+
+            write("Zombie Survivors", font, 70, this.middle.x, this.middle.y - 200, "White", "center")
+
+            write("Start game", font, 50, this.middle.x, this.middle.y - 80, "White", "center")
+
+            if (this.easy.clicked) {
+                states["game"] = new Game(1)
+            }
+            if (this.medium.clicked) {
+                states["game"] = new Game(2)
+            }
+            if (this.hard.clicked) {
+                states["game"] = new Game(3)
+            }
+
+            this.volume.update()
+            write("Volume: " + this.volume.value + "%", font, 30, this.middle.x - 150, this.volume.pos.y + 12, "White", "right")
+            let vol = volume
+            volume = this.volume.value / 100
+            if (volume!==vol){
+                localStorage.setItem("volume", volume)
+            }
+
+            this.scoreboard.update()
+            if (this.scoreboard.clicked) {
+                this.scoretab = true
+            }
+
+            write("Készítette: Füleki Balázs Q9329E", font, 40, windowSize.x - 10, windowSize.y - 10, "White", "right")
+
+        } else {
+            this.back.update()
+            if (this.back.clicked) {
+                this.scoretab = false
+            }
+            this.clear.update()
+            if (this.clear.clicked) {
+                scoreboard = []
+                localStorage.removeItem("scoreboard")
+            }
+
+            Score.listScores(100)
         }
-
-        write("Zombie Survivors", font, 70, this.middle.x, this.middle.y-200, "White", "center")
-
-        write("Start game", font, 50, this.middle.x, this.middle.y-80, "White", "center")
-
-        if (this.easy.clicked){
-            states["game"] = new Game(1)
-        }
-        if (this.medium.clicked){
-            states["game"] = new Game(2)
-        }
-        if (this.hard.clicked){
-            states["game"] = new Game(3)
-        }
-
-        this.volume.update()
-        write("Volume: "+this.volume.value+"%", font, 30, this.middle.x-150, this.volume.pos.y+12, "White", "right")
-        volume = this.volume.value/100
-
-        write("Készítette: Füleki Balázs Q9329E", font, 40, windowSize.x-10, windowSize.y-10, "White", "right")
     }
 }
 
@@ -650,8 +694,22 @@ class Score {
         state = "score"
 
         this.score = score
-        this.name = ""
+        this.name = lastname
     }
+    static listScores(y){
+        write("Scoreboard", font, 40, middle.x, y-45, "white", "center")
+
+        if (scoreboard.length===0){
+            write("No scores yet", font, 30, middle.x, y, "white", "center")
+        }
+
+        for (let i = scoreboard.length - 1; i >= 0; i--) {
+            write(scoreboard[i], font, 30, middle.x, y, "white", "center")
+            y+=35
+        }
+
+    }
+
     destruct(){
         states["score"] = null
     }
@@ -663,22 +721,15 @@ class Score {
         write("Your score: " + this.score, font, 50, middle.x, 160, "white", "center")
         write("Your name: " + this.name, font, 50, middle.x-450, 220, "white", )
 
-        write("Scoreboard", font, 40, middle.x, 300, "white", "center")
-
-        let y = 345
-        for (let i = scoreboard.length - 1; i >= 0; i--) {
-            write(scoreboard[i], font, 30, middle.x, y, "white", "center")
-            y+=35
-        }
-        if (scoreboard.length===0){
-            write("No scores yet", font, 30, middle.x, 345, "white", "center")
-        }
+        Score.listScores(345)
 
         if (keys.enter){
             this.destruct()
             state = "menu"
 
             scoreboard.push(this.name + ": " + this.score)
+            localStorage.setItem("scoreboard", JSON.stringify(scoreboard))
+            lastname = this.name
         }
     }
 }
