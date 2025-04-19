@@ -25,7 +25,7 @@ const keys = {
 let dt = 0.016
 
 const path = "Q9329E/assets/"
-const sources = {
+const assetSources = {
     player: 'player1.png',
     zombie1: 'zombie1.png',
     zombie2: 'zombie2.png',
@@ -35,7 +35,11 @@ const sources = {
     button1: 'button2.png',
     button2: 'button3.png',
 }
+const audioSources = {
+    fire: 'laserShoot_1_.ogg',
+}
 const Assets = {}
+const Audios = {}
 
 const font = "Arial"
 
@@ -53,7 +57,25 @@ function loadAssets(assetMap) {
             img.onerror = reject
         }))
     }
+    return Promise.all(promises)
+}
 
+function loadAudio(audioMap) {
+    const promises = []
+
+    for (const [key, src] of Object.entries(audioMap)) {
+        promises.push(new Promise((resolve, reject) => {
+            const audio = new Audio()
+            audio.src = path+src
+            audio.addEventListener('canplaythrough', () => {
+                Audios[key] = audio
+                resolve()
+            }, { once: true })
+            audio.addEventListener('error', () => {
+                reject(new Error(`Failed to load audio: ${src}`))
+            })
+        }))
+    }
     return Promise.all(promises)
 }
 
@@ -85,9 +107,16 @@ $(document).ready(function ready() {
         }
     })
 
-    loadAssets(sources).then(() => {
-        states["menu"] = new Menu()
-        main()
+    loadAssets(assetSources).then(() => {
+        loadAudio(audioSources).then(() => {
+            states["menu"] = new Menu()
+            states["perma"] = new Perma()
+            main()
+
+        }).catch(err => {
+            console.error('Failed to load audio:', err)
+        })
+
     }).catch(err => {
         console.error('Failed to load assets:', err)
     })
@@ -267,6 +296,11 @@ function Player(img, health, speed, firerate, bullets) {
             this.shot = true
             let bullet = new Bullet(Assets.bullet, new Vector2(50, 12).rotate(this.rot).add(this.pos), this.rot+getRndInteger(-2, 2), 1000)
             this.bulets.push(bullet)
+
+            let sound = Audios.fire.cloneNode()
+            sound.volume = volume
+            sound.play()
+
         } else {
             this.shootTimer-=dt
         }
@@ -299,7 +333,7 @@ function Bullet(img, pos, rotation, speed) {
 
         if (!this.wallRect.collidepoint(this.pos)){
             this.alive = false
-            return
+            return 0
         }
     }
     this.draw = function() {
@@ -396,7 +430,8 @@ class Button {
         }
 
         if (this.clicked && this.sound) {
-            //todo this.sound.play()
+            this.sound.volume = volume
+            this.sound.play()
         }
 
         return this.rect
@@ -460,25 +495,29 @@ class Game {
         this.enemyCap=14
         this.enemyMax=3
         this.zombies  = []
+        this.spawner = setInterval(this.spawn, 1000, this)
 
     }
     destruct(){
         states["game"] = null
+        clearInterval(this.spawner)
     }
+    spawn(game){
+        if (game.zombies.length<game.enemyMax){
+            if (getRndInteger(0, 10) < 8) {
+                game.zombies.push(new Zombie(Assets.zombie1, 50, 100, 100, game.player))
+            } else {
+                game.zombies.push(new Zombie(Assets.zombie2, 100, 60, 200, game.player))
+            }
+        }
+    }
+
     update() {
         if (prevState==="menu" && state==="game"){
-            console.log("game")
+            //console.log("game")
         }
 
         draw(Assets.grass, [1, 1], middle, [0, 0], 0)
-
-        if (this.zombies.length<this.enemyMax){
-            if (getRndInteger(0, 10) < 8) {
-                this.zombies.push(new Zombie(Assets.zombie1, 50, 100, 100, this.player))
-            } else {
-                this.zombies.push(new Zombie(Assets.zombie2, 100, 60, 200, this.player))
-            }
-        }
 
         // bullet zombie collide hit
         for (const zombie of this.zombies) {
@@ -560,11 +599,10 @@ class Menu {
             true, [this.middle.x-100, this.middle.x+100], [0, 100], 1)
         this.volume.value = volume*100
 
-        this.info = new Button(Assets.button2, [0.7, 0.7], new Vector2(windowSize.x, 0), [-0.5, 0.5], [1, 1], "?")
     }
     update() {
         if (prevState==="game" && state==="menu"){
-            console.log("menu")
+            //console.log("menu")
         }
 
         for (const button of this.dificulty) {
@@ -585,10 +623,18 @@ class Menu {
 
         this.volume.update()
         write("Volume: "+this.volume.value+"%", font, 30, this.middle.x-150, this.volume.pos.y+12, "White", "right")
-        volume = this.volume.value
+        volume = this.volume.value/100
 
-        write("Készítette: Füleki Balázs", font, 40, windowSize.x-10, windowSize.y-10, "White", "right")
+        write("Készítette: Füleki Balázs Q9329E", font, 40, windowSize.x-10, windowSize.y-10, "White", "right")
+    }
+}
 
+class Perma {
+    constructor() {
+        this.middle =windowSize.copy().mult(0.5)
+        this.info = new Button(Assets.button2, [0.7, 0.7], new Vector2(windowSize.x, 0), [-0.5, 0.5], [1, 1], "?")
+    }
+    update() {
         this.info.update()
         if (this.info.on[1]){
             let y=2.5
@@ -624,6 +670,7 @@ function main(timestamp) {
     let ps = state
 
     states[state].update()
+    states["perma"].update()
 
     prevState = ps
 
