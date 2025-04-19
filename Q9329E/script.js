@@ -4,6 +4,8 @@ const windowSize = new Vector2(1264, 720)
 const middle = windowSize.copy().mult(0.5)
 let volume = 0.5
 
+let scoreboard = []
+
 let state = "menu"
 let prevState = "game"
 
@@ -11,6 +13,8 @@ let states = {}
 
 const mousePos = new Vector2()
 let mouseClick = [false, false]
+let input = ""
+let backspace = 0
 
 const keys = {
     w: false,
@@ -99,6 +103,12 @@ $(document).ready(function ready() {
     $(window).on('keydown', (e) => {
         if (keys.hasOwnProperty(e.key.toLowerCase())) {
             keys[e.key.toLowerCase()] = 1
+        }
+        if (e.key.length===1) {
+            input += e.key
+        }
+        if (e.key==="Backspace") {
+            backspace += 1
         }
     })
     $(window).on('keyup', (e) => {
@@ -342,12 +352,13 @@ function Bullet(img, pos, rotation, speed) {
     }
 }
 
-function Zombie(img, health, speed, score, player) {
+function Zombie(img, health, speed, score, scale, player) {
     this.img = img
     this.health = health
     this.alive = true
     this.speed = speed
     this.score = score
+    this.scale = scale
     this.player = player
     this.pos = middle.copy().mult(1.3).rotate(getRndInteger(0, 360)).add(middle)
     this.rot = 0
@@ -368,7 +379,7 @@ function Zombie(img, health, speed, score, player) {
         return 0
     }
     this.draw = function() {
-        draw(this.img, [1.8, 1.8], this.pos, [0, 0], this.rot)
+        draw(this.img, [1.8*this.scale, 1.8*this.scale], this.pos, [0, 0], this.rot)
 
     }
 }
@@ -504,10 +515,10 @@ class Game {
     }
     spawn(game){
         if (game.zombies.length<game.enemyMax){
-            if (getRndInteger(0, 10) < 8) {
-                game.zombies.push(new Zombie(Assets.zombie1, 50, 100, 100, game.player))
+            if (getRndInteger(0, 10) < 7) {
+                game.zombies.push(new Zombie(Assets.zombie1, 50, 100, 100, 1, game.player))
             } else {
-                game.zombies.push(new Zombie(Assets.zombie2, 100, 60, 200, game.player))
+                game.zombies.push(new Zombie(Assets.zombie2, 100, 60, 200, 1.2, game.player))
             }
         }
     }
@@ -570,9 +581,12 @@ class Game {
 
         this.exit.update()
         if (this.exit.clicked){
+            this.player.health = 0
+        }
+
+        if (this.player.health<=0){
             this.destruct()
-            state = "menu"
-            return 0
+            states["score"] = new Score(this.score)
         }
 
     }
@@ -609,7 +623,9 @@ class Menu {
             button.update()
         }
 
-        write("Start game", font, 60, this.middle.x, this.middle.y-120, "White", "center")
+        write("Zombie Survivors", font, 70, this.middle.x, this.middle.y-200, "White", "center")
+
+        write("Start game", font, 50, this.middle.x, this.middle.y-80, "White", "center")
 
         if (this.easy.clicked){
             states["game"] = new Game(1)
@@ -626,6 +642,44 @@ class Menu {
         volume = this.volume.value/100
 
         write("Készítette: Füleki Balázs Q9329E", font, 40, windowSize.x-10, windowSize.y-10, "White", "right")
+    }
+}
+
+class Score {
+    constructor(score) {
+        state = "score"
+
+        this.score = score
+        this.name = ""
+    }
+    destruct(){
+        states["score"] = null
+    }
+    update() {
+        this.name+=input
+        this.name = this.name.slice(0, this.name.length-backspace)
+
+        write("Game over", font, 70, middle.x, 80, "white", "center")
+        write("Your score: " + this.score, font, 50, middle.x, 160, "white", "center")
+        write("Your name: " + this.name, font, 50, middle.x-450, 220, "white", )
+
+        write("Scoreboard", font, 40, middle.x, 300, "white", "center")
+
+        let y = 345
+        for (let i = scoreboard.length - 1; i >= 0; i--) {
+            write(scoreboard[i], font, 30, middle.x, y, "white", "center")
+            y+=35
+        }
+        if (scoreboard.length===0){
+            write("No scores yet", font, 30, middle.x, 345, "white", "center")
+        }
+
+        if (keys.enter){
+            this.destruct()
+            state = "menu"
+
+            scoreboard.push(this.name + ": " + this.score)
+        }
     }
 }
 
@@ -647,11 +701,11 @@ class Perma {
             write("Down: S", font, 24, this.middle.x+320, multi*y++, "White")
             write("Right: D", font, 24, this.middle.x+320, multi*y++, "White")
             write("Shoot: Left click", font, 24, this.middle.x+320, multi*y++, "White")
-            write("Flint and Steel: F", font, 24, this.middle.x+320, multi*y++, "White")
+            write("Save name and score: Enter", font, 24, this.middle.x+320, multi*y++, "White")
             y+=1
             write("Egyedűl maradtál egy", font, 24, this.middle.x+320, multi*y++, "White")
             write("zombi apokalipszis közepén.", font, 24, this.middle.x+320, multi*y++, "White")
-            write("A küldetésed minnél tovább", font, 24, this.middle.x+320, multi*y++, "White")
+            write("A küldetésed minél tovább", font, 24, this.middle.x+320, multi*y++, "White")
             write("életben maradni és", font, 24, this.middle.x+320, multi*y++, "White")
             write("magasabb pontszámot elérni", font, 24, this.middle.x+320, multi*y++, "White")
             write("a ranglétrán.", font, 24, this.middle.x+320, multi*y++, "White")
@@ -671,6 +725,9 @@ function main(timestamp) {
 
     states[state].update()
     states["perma"].update()
+
+    input = ""
+    backspace = 0
 
     prevState = ps
 
