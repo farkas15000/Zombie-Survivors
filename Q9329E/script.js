@@ -37,8 +37,8 @@ const assetSources = {
     bullet: 'bullet1.png',
     grass: 'grass.png',
     shoot: 'shoot.png',
-    button1: 'button2.png',
-    button2: 'button3.png',
+    button1: 'button1.png',
+    button2: 'button2.png',
 }
 const audioSources = {
     music: 'Gustavo Santaolalla - The Last of Us (Main Theme).mp3',
@@ -172,6 +172,7 @@ function clamp(value, min, max){
 function Vector2(x=0, y=0) {
     this.x = x
     this.y = y
+
     this.set = function(vector2) {
         this.x = vector2.x
         this.y = vector2.y
@@ -230,6 +231,7 @@ function Vector2(x=0, y=0) {
 function Rect(x=0, y=0, w=0, h=0) {
     this.pos = new Vector2(x, y)
     this.size = new Vector2(w, h)
+
     this.copy = function() {
         return new Rect(this.pos.x, this.pos.y, this.size.x, this.size.y)
     }
@@ -241,6 +243,13 @@ function Rect(x=0, y=0, w=0, h=0) {
             this.pos.x + rect.size.x > rect.pos.x &&
             this.pos.y < rect.pos.y + rect.size.y &&
             this.pos.y + this.size.y > rect.pos.y)
+    }
+    this.collidepoint = function (vector2){
+        return (this.pos.x < vector2.x &&
+            this.pos.x + this.size.x > vector2.x &&
+            this.pos.y < vector2.y &&
+            this.pos.y + this.size.y > vector2.y)
+
     }
     this.draw = function (){
         let style = ctx.strokeStyle
@@ -258,14 +267,6 @@ function Rect(x=0, y=0, w=0, h=0) {
         ctx.stroke ()
         ctx.fillStyle = style
     }
-    this.collidepoint = function (vector2){
-        return (this.pos.x < vector2.x &&
-            this.pos.x + this.size.x > vector2.x &&
-            this.pos.y < vector2.y &&
-            this.pos.y + this.size.y > vector2.y)
-
-    }
-
 }
 
 function write(text, font, size, x, y, color="Black", align="start"){
@@ -350,7 +351,6 @@ function Player(img, health, speed, firerate, bullets) {
         } else {
             this.shootTimer-=dt
         }
-
     }
     this.draw = function() {
         this.healthRect.pos.x = this.pos.x-39
@@ -360,6 +360,7 @@ function Player(img, health, speed, firerate, bullets) {
         health.drawFill("red")
 
         draw(this.img, [1, 1], this.pos, [0.25, -0.03], this.rot)
+
         if (this.shot){
             this.shot = false
             draw(Assets.shoot, [0.7, 0.6],  new Vector2(52, 11).rotate(this.rot).add(this.pos), [0.6, 0], this.rot)
@@ -389,7 +390,6 @@ function Bullet(img, pos, rotation, speed) {
     }
     this.draw = function() {
         draw(this.img, [0.6, 0.6], this.pos, [0, 0], this.rot)
-
     }
 }
 
@@ -401,7 +401,7 @@ function Zombie(img, health, speed, score, scale, player) {
     this.score = score
     this.scale = scale
     this.player = player
-    this.pos = middle.copy().mult(1.3).rotate(getRndInteger(0, 360)).add(middle)
+    this.pos = middle.copy().mult(1.2).rotate(getRndInteger(0, 360)).add(middle)
     this.rot = 0
 
     this.update = function() {
@@ -424,7 +424,6 @@ function Zombie(img, health, speed, score, scale, player) {
     }
     this.draw = function() {
         draw(this.img, [1.8*this.scale, 1.8*this.scale], this.pos, [0, 0], this.rot)
-
     }
 }
 
@@ -545,7 +544,7 @@ class Game {
         this.exit = new Button(Assets.button2, [0.8, 0.5], new Vector2(50, 40), [0, 0], [1.1, 1.1], "Exit", Audios.click)
 
         this.bullets = []
-        this.player = new Player(Assets.player, 100, 300, 8, this.bullets)
+        this.player = new Player(Assets.player, 100, 300, 7+this.diff, this.bullets)
 
         this.enemyCap=12*this.diff
         this.enemyMax=2+this.diff
@@ -587,7 +586,6 @@ class Game {
                     let sound = Audios.hit.cloneNode()
                     sound.volume = volume*0.5
                     sound.play()
-
                 }
             }
         }
@@ -670,7 +668,6 @@ class Menu {
         this.back = new Button(Assets.button2, [0.8, 0.5], new Vector2(50, 40), [0, 0], [1.1, 1.1], "Back", Audios.click)
         this.clear = new Button(Assets.button1, [0.5, 0.5], new Vector2(860, 40), [0, 0], [1.1, 1.1], "Clear", Audios.click)
         this.scoretab = false
-
     }
     update() {
         if (prevState==="game" && state==="menu"){
