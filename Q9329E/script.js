@@ -41,7 +41,11 @@ const assetSources = {
     button2: 'button3.png',
 }
 const audioSources = {
-    fire: 'laserShoot_1_.ogg',
+    music: 'Gustavo Santaolalla - The Last of Us (Main Theme).mp3',
+    fire: 'fire.wav',
+    click: 'click.wav',
+    hit: 'hit.wav',
+    hurt: 'hurt.wav',
 }
 const Assets = {}
 const Audios = {}
@@ -85,7 +89,7 @@ function loadAudio(audioMap) {
 }
 
 function getRndInteger(min, max) {
-    return Math.floor(Math.random() * (max - min) ) + min;
+    return Math.floor(Math.random() * (max - min) ) + min
 }
 
 $(document).ready(function ready() {
@@ -133,8 +137,10 @@ $(document).ready(function ready() {
 
     loadAssets(assetSources).then(() => {
         loadAudio(audioSources).then(() => {
+
             states["menu"] = new Menu()
             states["perma"] = new Perma()
+
             main()
 
         }).catch(err => {
@@ -145,6 +151,13 @@ $(document).ready(function ready() {
         console.error('Failed to load assets:', err)
     })
 })
+
+function startMusic(){
+    let sound = Audios.music
+    sound.loop = true
+    sound.volume = volume*0.2
+    sound.play()
+}
 
 function getMouse(e){
     const rect = canvas.getBoundingClientRect()
@@ -176,8 +189,8 @@ function Vector2(x=0, y=0) {
     }
     this.rotate = function(deg) {
         let rad = deg * (Math.PI/180)
-        const c = Math.cos(rad);
-        const s = Math.sin(rad);
+        const c = Math.cos(rad)
+        const s = Math.sin(rad)
         let x = this.x
         let y = this.y
         this.x = x * c + y * -s
@@ -231,11 +244,19 @@ function Rect(x=0, y=0, w=0, h=0) {
     }
     this.draw = function (){
         let style = ctx.strokeStyle
-        ctx.strokeStyle = "red";
+        ctx.strokeStyle = "red"
         ctx.beginPath ()
         ctx.strokeRect(this.pos.x, this.pos.y, this.size.x, this.size.y)
         ctx.stroke ()
         ctx.strokeStyle = style
+    }
+    this.drawFill = function (color){
+        let style = ctx.fillStyle
+        ctx.fillStyle = color
+        ctx.beginPath ()
+        ctx.fillRect(this.pos.x, this.pos.y, this.size.x, this.size.y)
+        ctx.stroke ()
+        ctx.fillStyle = style
     }
     this.collidepoint = function (vector2){
         return (this.pos.x < vector2.x &&
@@ -305,6 +326,7 @@ function Player(img, health, speed, firerate, bullets) {
     this.rot = 0
     let padding = 20
     this.wallRect = new Rect(padding, padding, windowSize.x-2*padding, windowSize.y-2*padding)
+    this.healthRect = new Rect(0, 0, 80, 12)
 
     this.update = function() {
 
@@ -322,7 +344,7 @@ function Player(img, health, speed, firerate, bullets) {
             this.bulets.push(bullet)
 
             let sound = Audios.fire.cloneNode()
-            sound.volume = volume
+            sound.volume = volume*0.3
             sound.play()
 
         } else {
@@ -331,13 +353,18 @@ function Player(img, health, speed, firerate, bullets) {
 
     }
     this.draw = function() {
+        this.healthRect.pos.x = this.pos.x-39
+        this.healthRect.pos.y = this.pos.y-50
+        this.healthRect.drawFill("black")
+        health = new Rect(this.healthRect.pos.x+1,this.healthRect.pos.y+1, Math.max(this.health*0.78, 0), 10)
+        health.drawFill("red")
+
         draw(this.img, [1, 1], this.pos, [0.25, -0.03], this.rot)
         if (this.shot){
             this.shot = false
             draw(Assets.shoot, [0.7, 0.6],  new Vector2(52, 11).rotate(this.rot).add(this.pos), [0.6, 0], this.rot)
 
         }
-
     }
 }
 
@@ -388,7 +415,10 @@ function Zombie(img, health, speed, score, scale, player) {
             let vect = new Vector2(this.speed * dt, 0).rotate(this.rot)
             this.pos.add(vect)
         } else {
-            this.player.health-=dt*15
+            this.player.health-=dt*40
+            let sound = Audios.hurt
+            sound.volume = volume
+            sound.play()
         }
         return 0
     }
@@ -484,7 +514,7 @@ class Slider extends Button {
         this.value = value_map[0]
     }
     get value() {
-        return this._value;
+        return this._value
     }
     set value(value) {
         let mod = value % this.stepSize
@@ -495,7 +525,7 @@ class Slider extends Button {
     }
 
     update(doDraw = true) {
-        let rect = super.update(doDraw);
+        let rect = super.update(doDraw)
 
         if (this.grabbed && !this.clicked)
         {
@@ -512,15 +542,18 @@ class Game {
         this.score = 0
         state = "game"
 
-        this.exit = new Button(Assets.button2, [0.8, 0.5], new Vector2(50, 40), [0, 0], [1.1, 1.1], "Exit")
+        this.exit = new Button(Assets.button2, [0.8, 0.5], new Vector2(50, 40), [0, 0], [1.1, 1.1], "Exit", Audios.click)
 
         this.bullets = []
         this.player = new Player(Assets.player, 100, 300, 8, this.bullets)
 
-        this.enemyCap=14
-        this.enemyMax=3
+        this.enemyCap=12*this.diff
+        this.enemyMax=2+this.diff
         this.zombies  = []
-        this.spawner = setInterval(this.spawn, 1000, this)
+
+        this.spawner = setInterval(this.spawn, 900-100*this.diff, this)
+
+        startMusic()
 
     }
     destruct(){
@@ -529,10 +562,10 @@ class Game {
     }
     spawn(game){
         if (game.zombies.length<game.enemyMax){
-            if (getRndInteger(0, 10) < 7) {
-                game.zombies.push(new Zombie(Assets.zombie1, 50, 100, 100, 1, game.player))
+            if (getRndInteger(0, 10) < 8) {
+                game.zombies.push(new Zombie(Assets.zombie1, 13*game.diff, 100, 100*game.diff, 1, game.player))
             } else {
-                game.zombies.push(new Zombie(Assets.zombie2, 100, 60, 200, 1.2, game.player))
+                game.zombies.push(new Zombie(Assets.zombie2, 23*game.diff, 60, 200*game.diff, 1.2, game.player))
             }
         }
     }
@@ -550,6 +583,11 @@ class Game {
                 if (bullet.alive && zombie.alive && zombie.pos.distanceToSquared(bullet.pos) <= 30**2){
                     zombie.health-=10
                     bullet.alive=false
+
+                    let sound = Audios.hit.cloneNode()
+                    sound.volume = volume*0.5
+                    sound.play()
+
                 }
             }
         }
@@ -574,7 +612,7 @@ class Game {
             zombie.draw()
 
             if (died){
-                this.enemyMax = Math.min(this.enemyCap, this.enemyMax+0.1)
+                this.enemyMax = Math.min(this.enemyCap, this.enemyMax+0.2*this.diff)
                 this.score+=zombie.score
             }
 
@@ -618,20 +656,20 @@ class Menu {
     constructor() {
         this.middle =windowSize.copy().mult(0.5)
 
-        this.easy = new Button(Assets.button1, [0.6, 0.8], new Vector2(-200, 0).add(this.middle), [0, 0], [1.1, 1.1], "Easy")
-        this.medium = new Button(Assets.button1, [0.6, 0.8], new Vector2(0, 0).add(this.middle), [0, 0], [1.1, 1.1], "Medium")
-        this.hard = new Button(Assets.button1, [0.6, 0.8], new Vector2(200, 0).add(this.middle), [0, 0], [1.1, 1.1], "Hard")
+        this.easy = new Button(Assets.button1, [0.6, 0.8], new Vector2(-200, 0).add(this.middle), [0, 0], [1.1, 1.1], "Easy", Audios.click)
+        this.medium = new Button(Assets.button1, [0.6, 0.8], new Vector2(0, 0).add(this.middle), [0, 0], [1.1, 1.1], "Medium", Audios.click)
+        this.hard = new Button(Assets.button1, [0.6, 0.8], new Vector2(200, 0).add(this.middle), [0, 0], [1.1, 1.1], "Hard", Audios.click)
         this.dificulty =[this.easy, this.medium, this.hard]
 
-        this.volume = new Slider(Assets.button2, [0.6, 0.6], new Vector2(100, this.middle.y+120), [0, 0], [1.1, 1.1], "",null,
+        this.volume = new Slider(Assets.button2, [0.6, 0.6], new Vector2(100, this.middle.y+120), [0, 0], [1.1, 1.1], "", Audios.click,
             true, [this.middle.x-100, this.middle.x+100], [0, 100], 1)
+        this.volumeline = new Rect(middle.x-133, this.middle.y+110, 266, 20)
         this.volume.value = volume*100
 
-        this.scoreboard = new Button(Assets.button1, [0.8, 0.8], new Vector2(0, 220).add(this.middle), [0, 0], [1.1, 1.1], "Scoreboard")
-        this.back = new Button(Assets.button2, [0.8, 0.5], new Vector2(50, 40), [0, 0], [1.1, 1.1], "Back")
-        this.clear = new Button(Assets.button1, [0.5, 0.5], new Vector2(860, 40), [0, 0], [1.1, 1.1], "Clear")
+        this.scoreboard = new Button(Assets.button1, [0.8, 0.8], new Vector2(0, 220).add(this.middle), [0, 0], [1.1, 1.1], "Scoreboard", Audios.click)
+        this.back = new Button(Assets.button2, [0.8, 0.5], new Vector2(50, 40), [0, 0], [1.1, 1.1], "Back", Audios.click)
+        this.clear = new Button(Assets.button1, [0.5, 0.5], new Vector2(860, 40), [0, 0], [1.1, 1.1], "Clear", Audios.click)
         this.scoretab = false
-
 
     }
     update() {
@@ -658,12 +696,14 @@ class Menu {
                 states["game"] = new Game(3)
             }
 
+            this.volumeline.drawFill("white")
             this.volume.update()
-            write("Volume: " + this.volume.value + "%", font, 30, this.middle.x - 150, this.volume.pos.y + 12, "White", "right")
+            write("Volume: " + this.volume.value + "%", font, 30, this.middle.x - 350, this.volume.pos.y + 12, "White", )
             let vol = volume
             volume = this.volume.value / 100
             if (volume!==vol){
                 localStorage.setItem("volume", volume)
+                Audios.music.volume=volume*0.2
             }
 
             this.scoreboard.update()
@@ -723,13 +763,18 @@ class Score {
 
         Score.listScores(345)
 
-        if (keys.enter){
+        if (keys.enter && this.name.trim()){
+            this.name = this.name.trim()
             this.destruct()
             state = "menu"
 
             scoreboard.push(this.name + ": " + this.score)
             localStorage.setItem("scoreboard", JSON.stringify(scoreboard))
             lastname = this.name
+
+            let sound = Audios.click
+            sound.volume = volume
+            sound.play()
         }
     }
 }
@@ -766,9 +811,9 @@ class Perma {
 }
 
 function main(timestamp) {
-    if (!main.lastTime) main.lastTime = timestamp;
-    dt = (timestamp - main.lastTime) / 1000; // in seconds
-    main.lastTime = timestamp;
+    if (!main.lastTime) main.lastTime = timestamp
+    dt = (timestamp - main.lastTime) / 1000
+    main.lastTime = timestamp
 
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
