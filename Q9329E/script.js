@@ -29,7 +29,7 @@ const keys = {
 
 let dt = 0.016
 
-const path = "Q9329E/assets/"
+const path = "assets/"
 const assetSources = {
     player: 'player1.png',
     zombie1: 'zombie1.png',
